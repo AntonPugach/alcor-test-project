@@ -1,0 +1,24 @@
+{
+  "name": "alcor/manual-payroll-adjustments",
+  "description": "Event-sourced model for auditable payroll line corrections",
+  "type": "project",
+  "require": {
+    "php": "^8.5"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^13.0"
+  },
+  "autoload": {
+    "psr-4": {
+      "Alcor\\Payroll\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Alcor\\Payroll\\Tests\\": "tests/"
+    }
+  },
+  "scripts": {
+    "test": "phpunit"
+  }
+}
