@@ -84,20 +84,39 @@ final class InMemoryPayrollEventStoreTest extends TestCase
         self::assertSame(500, $store->eventsFor($secondId)[0]->amount->cents);
     }
 
-    public function test_empty_append_does_not_create_or_extend_a_stream(): void
+    public function test_empty_append_does_not_create_a_stream(): void
     {
-        $store = new InMemoryPayrollEventStore();
-        $id    = new PayrollLineId('salary-line');
-        $store->append($id, [new SystemValueCalculated($id, new MoneyAmount(1_000))], 0);
+        $eventStore = new InMemoryPayrollEventStore();
+        $limeId = new PayrollLineId('payroll-line-1');
 
-        $store->append($id, [], 1);
-        $store->append($id, [new SystemValueCalculated($id, new MoneyAmount(1_100))], 1);
+        // Empty append to a non-existing stream.
+        $eventStore->append($limeId, [], 0);
 
-        $history = $store->eventsFor($id);
-        self::assertCount(2, $history);
-        self::assertSame([1_000, 1_100], array_map(
-            static fn(SystemValueCalculated $event): int => $event->amount->cents,
-            $history,
-        ));
+        // The stream must still be considered new.
+        // A subsequent append with expected version 0 must succeed.
+        $eventStore->append($limeId, [new SystemValueCalculated($limeId, new MoneyAmount(100_000))], 0);
+
+        $storedEvents = $eventStore->eventsFor($limeId);
+        self::assertCount(1, $storedEvents);
+        self::assertSame(100_000, $storedEvents[0]->amount->cents);
+    }
+
+    public function test_empty_append_does_not_change_existing_stream_version(): void
+    {
+        $eventStore = new InMemoryPayrollEventStore();
+        $limeId = new PayrollLineId('payroll-line-1');
+
+        $eventStore->append($limeId, [new SystemValueCalculated($limeId, new MoneyAmount(100_000))], 0);
+
+        // Empty append must not increment the stream version.
+        $eventStore->append($limeId, [], 1);
+
+        // Version must still be 1, so expected version 1 is valid.
+        $eventStore->append($limeId, [new SystemValueCalculated($limeId, new MoneyAmount(105_000))], 1);
+
+        $storedEvents = $eventStore->eventsFor($limeId);
+        self::assertCount(2, $storedEvents);
+        self::assertSame(100_000, $storedEvents[0]->amount->cents);
+        self::assertSame(105_000, $storedEvents[1]->amount->cents);
     }
 }
