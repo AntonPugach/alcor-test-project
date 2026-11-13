@@ -20,6 +20,7 @@
     }
   },
   "scripts": {
-    "test": "phpunit"
+    "test": "phpunit",
+    "example": "php bin/demo.php"
   }
 }

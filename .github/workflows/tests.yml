@@ -41,3 +41,6 @@ jobs:
 
       - name: Run test suite
         run: composer test
+
+      - name: Verify CLI example
+        run: composer example

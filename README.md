@@ -29,7 +29,7 @@ The Composer constraint is PHP `^8.5` (PHP 8.5 or a later PHP 8.x release) and C
 ```sh
 composer install
 composer test
-php bin/demo.php
+composer example
 ```
 
 The demo follows the assignment example. It recalculates the system value to `$1,050.00`, then applies five manual corrections. It prints the frozen system value, each adjustment and comment, and the expected final value of `$1,104.45`.
