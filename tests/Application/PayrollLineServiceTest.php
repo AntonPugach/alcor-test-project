@@ -12,6 +12,7 @@ use Alcor\Payroll\Domain\Event\SystemValueCalculated;
 use Alcor\Payroll\Domain\ValueObject\AdjustmentAmount;
 use Alcor\Payroll\Domain\ValueObject\AdjustmentComment;
 use Alcor\Payroll\Domain\ValueObject\PayrollLineId;
+use Alcor\Payroll\Domain\ValueObject\MoneyAmount;
 use Alcor\Payroll\Infrastructure\InMemoryPayrollEventStore;
 use PHPUnit\Framework\TestCase;
 
@@ -72,7 +73,7 @@ final class PayrollLineServiceTest extends TestCase
     {
         $id         = new PayrollLineId('salary-line');
         $innerStore = new InMemoryPayrollEventStore();
-        $innerStore->append($id, [new SystemValueCalculated($id, new AdjustmentAmount(1_000))], 0);
+        $innerStore->append($id, [new SystemValueCalculated($id, new MoneyAmount(1_000))], 0);
         $store   = new ConcurrentAppendOnReadStore($innerStore, $id);
         $service = new PayrollLineService($store);
 

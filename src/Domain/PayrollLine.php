@@ -9,6 +9,7 @@ use Alcor\Payroll\Domain\Event\PayrollEvent;
 use Alcor\Payroll\Domain\Event\SystemValueCalculated;
 use Alcor\Payroll\Domain\ValueObject\AdjustmentAmount;
 use Alcor\Payroll\Domain\ValueObject\AdjustmentComment;
+use Alcor\Payroll\Domain\ValueObject\MoneyAmount;
 use Alcor\Payroll\Domain\ValueObject\PayrollLineId;
 use DomainException;
 use InvalidArgumentException;
@@ -50,7 +51,7 @@ final class PayrollLine
             return;
         }
 
-        $amount = new AdjustmentAmount($amountCents);
+        $amount = new MoneyAmount($amountCents);
         $this->record(new SystemValueCalculated($this->id, $amount));
     }
 

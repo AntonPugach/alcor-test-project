@@ -9,6 +9,7 @@ use Alcor\Payroll\Domain\Event\SystemValueCalculated;
 use Alcor\Payroll\Domain\PayrollLine;
 use Alcor\Payroll\Domain\ValueObject\AdjustmentAmount;
 use Alcor\Payroll\Domain\ValueObject\AdjustmentComment;
+use Alcor\Payroll\Domain\ValueObject\MoneyAmount;
 use Alcor\Payroll\Domain\ValueObject\PayrollLineId;
 use DomainException;
 use InvalidArgumentException;
@@ -20,7 +21,7 @@ final class PayrollLineTest extends TestCase
     {
         $id   = new PayrollLineId('salary-line');
         $line = PayrollLine::reconstitute($id, [
-            new SystemValueCalculated($id, new AdjustmentAmount(105_000)),
+            new SystemValueCalculated($id, new MoneyAmount(105_000)),
         ]);
         $line->addAdjustment(-4_555, ' Declined dental benefit ');
         $line->recalculate(120_000);
@@ -34,9 +35,25 @@ final class PayrollLineTest extends TestCase
 
     public function test_it_rejects_zero_value_adjustments(): void
     {
+        $id = new PayrollLineId('salary-line');
+        $line = PayrollLine::start($id);
+        $line->recalculate(1_000);
+
         $this->expectException(InvalidArgumentException::class);
 
-        new AdjustmentAmount(0);
+        $line->addAdjustment(0, 'Must not change the value.');
+    }
+
+    public function test_system_calculation_accepts_zero_positive_and_negative_amounts(): void
+    {
+        foreach ([0, 1_000, -1_000] as $amountCents) {
+            $id = new PayrollLineId('salary-line-' . $amountCents);
+            $line = PayrollLine::start($id);
+            $line->recalculate($amountCents);
+
+            self::assertSame($amountCents, $line->systemValueCents());
+            self::assertSame($amountCents, $line->currentValueCents());
+        }
     }
 
     public function test_empty_and_whitespace_only_comments_are_rejected(): void
@@ -68,7 +85,7 @@ final class PayrollLineTest extends TestCase
 
         $this->expectException(InvalidArgumentException::class);
         PayrollLine::reconstitute($lineId, [
-            new SystemValueCalculated($otherLineId, new AdjustmentAmount(1_000)),
+            new SystemValueCalculated($otherLineId, new MoneyAmount(1_000)),
         ]);
     }
 
@@ -76,7 +93,7 @@ final class PayrollLineTest extends TestCase
     {
         $id   = new PayrollLineId('salary-line');
         $line = PayrollLine::reconstitute($id, [
-            new SystemValueCalculated($id, new AdjustmentAmount(1_000)),
+            new SystemValueCalculated($id, new MoneyAmount(1_000)),
             new ManualAdjustmentAdded($id, new AdjustmentAmount(100), new AdjustmentComment('Correction')),
         ]);
 

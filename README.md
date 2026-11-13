@@ -10,7 +10,7 @@ A small PHP domain model for the history of manual adjustments to an automatical
 - Adjustments are appended as immutable events. A mistake is corrected by adding another adjustment; previous events are not edited or deleted.
 - The current value is the frozen system value plus every adjustment, in event order.
 
-Money uses integer cents to avoid floating-point arithmetic. Zero-value adjustments are rejected. The line must have a system value before it can be adjusted.
+Money uses integer cents to avoid floating-point arithmetic. System-calculated values use `MoneyAmount` and may be zero. Manual corrections use `AdjustmentAmount`, which rejects zero. The line must have a system value before it can be adjusted.
 
 ## Subject area and responsibility boundaries
 
