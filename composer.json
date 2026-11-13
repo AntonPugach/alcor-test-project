@@ -1,6 +1,7 @@
 {
   "name": "alcor/manual-payroll-adjustments",
   "description": "Event-sourced model for auditable payroll line corrections",
+  "license": "proprietary",
   "type": "project",
   "require": {
     "php": "^8.5"
