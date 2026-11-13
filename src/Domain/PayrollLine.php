@@ -63,8 +63,7 @@ final class PayrollLine
         $comment = new AdjustmentComment($comment);
         $event   = new ManualAdjustmentAdded($this->id, $amount, $comment);
 
-        $this->applyAdjustment($event);
-        $this->recordedEvents[] = $event;
+        $this->record($event);
     }
 
     public function currentValueCents(): int
@@ -121,18 +120,11 @@ final class PayrollLine
                 throw new DomainException('A manual adjustment cannot precede the first system calculation.');
             }
 
-            $this->applyAdjustment($event);
+            $this->adjustments[] = $event;
             return;
         }
 
         throw new InvalidArgumentException('Unsupported payroll event.');
-    }
-
-    private function applyAdjustment(
-        ManualAdjustmentAdded $event,
-    ): void {
-        $this->requireSystemValue();
-        $this->adjustments[] = $event;
     }
 
     private function requireSystemValue(): void
