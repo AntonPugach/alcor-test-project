@@ -1,37 +1,90 @@
 # Payroll Line Adjustments
 
-This PHP project models the history of manual corrections to an automatically calculated payroll line. It includes a command-line demo and PHPUnit tests, but no web interface or framework.
+A small PHP 8.5 project demonstrating an event-driven domain model for payroll line adjustments. It uses a lightweight layered architecture, an append-only event history, and optimistic concurrency checks.
 
-## Rules
+The project is intentionally kept small. It includes a CLI example and PHPUnit tests, but no framework, web interface, or external infrastructure.
 
-- The system can recalculate a line until its first manual adjustment.
-- That adjustment freezes the system value as the line's base. Later system recalculations are ignored.
-- Manual adjustments are signed, non-zero amounts in cents and require a comment.
-- Adjustments are append-only. A mistake is fixed by adding a compensating adjustment; earlier events are retained.
-- The current value is the frozen system value plus the adjustments in order.
+## Project Structure
 
-System calculations use `MoneyAmount`, which permits zero. Manual adjustments use `AdjustmentAmount`, which rejects zero. `AdjustmentComment` trims whitespace and rejects comments that are empty after trimming.
+```text
+src/
+  Domain/
+    Event/
+    ValueObject/
+    PayrollLine.php
+  Application/
+    Exception/
+    Port/
+      Inbound/
+      Outbound/
+    ReadModel/
+    PayrollLineService.php
+  Infrastructure/
+    InMemoryPayrollEventStore.php
+bin/
+  demo.php
+tests/
+  Application/
+  Domain/
+  Infrastructure/
+```
 
-## Scope and code boundaries
+### Domain
 
-The project owns one payroll line's calculated value, manual adjustment history, and current value. Salary calculation, employee records, benefit eligibility, and payroll runs are outside its scope; the model receives the system-calculated amount from elsewhere.
+`PayrollLine` is the aggregate responsible for enforcing domain invariants and rebuilding its state through event replay.
 
-`PayrollLine` enforces the rules and rebuilds its state by replaying events. `PayrollLineService` implements the inbound `PayrollLineUseCases` port: it loads a line's history, performs an operation, and appends only the events created by that operation. It uses the outbound `PayrollEventStore` port and returns `PayrollLineSnapshot` and `AdjustmentSnapshot` read data. `bin/demo.php` is the CLI adapter and composition root.
+Domain events represent system calculations and manual adjustments. Value Objects encapsulate amounts, comments, and payroll line identifiers.
 
-`InMemoryPayrollEventStore` is the storage adapter. It checks the expected version against the stream's event count and validates the complete batch before replacing the stream with the appended history. A stale version or a mismatched line ID leaves the history unchanged. The service skips appends when an operation produces no events.
+### Application
 
-The in-memory store is temporary: its data disappears when the process exits, and separate processes do not share its version checks. A production store would need durable storage and an atomic version check and append shared by all writers.
+`PayrollLineService` coordinates commands and the read use case. It loads the event history, reconstructs the aggregate, executes an operation, and persists newly recorded events.
 
-## Requirements and commands
+The application layer depends on inbound and outbound ports rather than concrete infrastructure.
 
-The Composer constraint is PHP `^8.5` (PHP 8.5 or a later PHP 8.x release) and Composer.
+### Infrastructure
 
-```sh
+`InMemoryPayrollEventStore` implements the event storage contract. `bin/demo.php` acts as the CLI entry point and composition root, wiring the required dependencies manually.
+
+## Design Decisions and Trade-offs
+
+The implementation deliberately favors simplicity over production infrastructure.
+
+- **In-memory storage.** The event store keeps data in PHP arrays, so history is lost when the process exits. Its optimistic concurrency checks work within a single instance only. A production implementation would require durable storage and an atomic version check and append.
+- **Integer arithmetic.** Money is represented in cents to avoid floating-point calculations. Explicit overflow checks and business-level amount limits are not implemented; values are assumed to fit within the PHP integer range.
+- **Minimal event metadata.** Events contain only the data needed by the current domain model. Actor IDs, timestamps, correlation IDs, and other audit metadata are omitted because audit processing is outside the scope of this exercise.
+- **Lightweight architecture.** Separate ports, event classes, and read DTOs introduce some additional abstractions for a feature with only two commands and one read use case. They were kept to make domain and infrastructure boundaries explicit, not to build a full CQRS framework. Commands and queries still share the same application service.
+- **No persisted Event Sourcing snapshots.** The aggregate is rebuilt by replaying its event history. For the expected size of the event stream, this is simpler than maintaining snapshot versions and consistency. `PayrollLineSnapshot` and `AdjustmentSnapshot` are read DTOs, not persisted aggregate snapshots.
+
+The project also leaves out database integration, event serialization and schema evolution, command idempotency, authentication, authorization, currency handling, and separate read-side storage. These concerns can be introduced when actual requirements justify them.
+
+## Running the Project
+
+Install dependencies:
+
+```bash
 composer install
+```
+
+Run the test suite:
+
+```bash
 composer test
+```
+
+Run the CLI example:
+
+```bash
 composer example
 ```
 
-The demo follows the assignment example. It recalculates the system value to `$1,050.00`, then applies five manual corrections. It prints the frozen system value, each adjustment and comment, and the expected final value of `$1,104.45`.
+## Tests and CI
 
-The PHPUnit suite covers the Domain, Application, and Infrastructure behavior, including event replay and optimistic concurrency conflicts.
+The PHPUnit suite covers domain invariants, event replay, adjustment history, optimistic concurrency, and Event Store behavior.
+
+GitHub Actions runs Composer validation, installs dependencies, executes the test suite, and runs the CLI example on PHP 8.5.
+
+## Production Considerations
+
+Before production use, the main areas to revisit would be durable event storage with atomic concurrency control, overflow-safe monetary calculations, audit metadata, command idempotency, and event schema versioning.
+
+Persisted aggregate snapshots or a separate read model should be introduced only when event volume or performance requirements make their additional complexity worthwhile.
