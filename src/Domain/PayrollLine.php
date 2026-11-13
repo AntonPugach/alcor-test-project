@@ -33,7 +33,7 @@ final class PayrollLine
         return new self($id);
     }
 
-    /** @param  list<PayrollEvent>  $history */
+    /** @param list<PayrollEvent> $history */
     public static function reconstitute(PayrollLineId $id, array $history): self
     {
         $line = self::start($id);

@@ -1,43 +1,30 @@
 # Payroll Line Adjustments
 
-A small PHP domain model for the history of manual adjustments to an automatically calculated payroll line. It demonstrates the supplied assignment without a web UI or framework.
+This PHP project models the history of manual corrections to an automatically calculated payroll line. It includes a command-line demo and PHPUnit tests, but no web interface or framework.
 
-## Business rules
+## Rules
 
-- A payroll line receives system-calculated values until a specialist adds the first manual adjustment.
-- The system value in effect immediately before that first adjustment becomes the frozen base value. Later recalculations are ignored.
-- Each adjustment is a non-zero signed amount in cents and requires a non-blank comment.
-- Adjustments are appended as immutable events. A mistake is corrected by adding another adjustment; previous events are not edited or deleted.
-- The current value is the frozen system value plus every adjustment, in event order.
+- The system can recalculate a line until its first manual adjustment.
+- That adjustment freezes the system value as the line's base. Later system recalculations are ignored.
+- Manual adjustments are signed, non-zero amounts in cents and require a comment.
+- Adjustments are append-only. A mistake is fixed by adding a compensating adjustment; earlier events are retained.
+- The current value is the frozen system value plus the adjustments in order.
 
-Money uses integer cents to avoid floating-point arithmetic. System-calculated values use `MoneyAmount` and may be zero. Manual corrections use `AdjustmentAmount`, which rejects zero. The line must have a system value before it can be adjusted.
+System calculations use `MoneyAmount`, which permits zero. Manual adjustments use `AdjustmentAmount`, which rejects zero. `AdjustmentComment` trims whitespace and rejects comments that are empty after trimming.
 
-## Subject area and responsibility boundaries
+## Scope and code boundaries
 
-The bounded context is **Manual Payroll Line Adjustments**. It owns the history and current value of one payroll line after the payroll calculation system supplies a base value. It does not calculate salaries, decide benefit eligibility, manage employees, or run payroll. Those are external subject areas and enter this model only through a calculated amount.
+The project owns one payroll line's calculated value, manual adjustment history, and current value. Salary calculation, employee records, benefit eligibility, and payroll runs are outside its scope; the model receives the system-calculated amount from elsewhere.
 
-Within this context:
+`PayrollLine` enforces the rules and rebuilds its state by replaying events. `PayrollLineService` implements the inbound `PayrollLineUseCases` port: it loads a line's history, performs an operation, and appends only the events created by that operation. It uses the outbound `PayrollEventStore` port and returns `PayrollLineSnapshot` and `AdjustmentSnapshot` read data. `bin/demo.php` is the CLI adapter and composition root.
 
-- **Payroll line:** `PayrollLine` owns the invariant that system recalculation stops after the first manual adjustment, the signed adjustment sequence, and the resulting value.
-- **Adjustment audit:** `SystemValueCalculated` and `ManualAdjustmentAdded` are the append-only facts that explain the line's current state. A correction is another event; the model exposes no edit or delete operation.
-- **Use case orchestration:** `PayrollLineService` loads a line's event history, asks the aggregate to make a change, and appends newly recorded events. It does not make payroll policy decisions.
-- **Event persistence:** the `PayrollEventStore` outbound port defines the persistence capability the use case needs. The adapter owns storage mechanics, not domain rules.
-- **Line read view:** `PayrollLineSnapshot` and `AdjustmentSnapshot` are application-facing output data. They expose current state and audit details without leaking the aggregate or event classes to delivery clients.
+`InMemoryPayrollEventStore` is the storage adapter. It checks the expected version against the stream's event count and validates the complete batch before replacing the stream with the appended history. A stale version or a mismatched line ID leaves the history unchanged. The service skips appends when an operation produces no events.
 
-## Clean and Hexagonal Architecture
+The in-memory store is temporary: its data disappears when the process exits, and separate processes do not share its version checks. A production store would need durable storage and an atomic version check and append shared by all writers.
 
-The inbound `PayrollLineUseCases` port is the API for driving the application. `PayrollLineService` implements it. The outbound `PayrollEventStore` port is the API the application uses to persist and load history. `InMemoryPayrollEventStore` is a replaceable adapter for that port, while `bin/demo.php` is a CLI driving adapter and the composition root.
+## Requirements and commands
 
-Dependencies point inward: the CLI and infrastructure adapter depend on application contracts; application code depends on the domain; the domain depends only on PHP. The service receives its outbound port through constructor injection. The domain aggregate validates both new commands and replayed history, keeping business rules in one place. Read views are mapped at the application boundary so the delivery side does not depend on domain event types.
-
-The `PayrollLineId`, `AdjustmentAmount`, and `AdjustmentComment` value objects protect domain inputs. The event-store append port takes an `expectedVersion`; the in-memory adapter checks the current event count and validates the full batch before changing the stream, so a version conflict or invalid event cannot cause a partial append. The application skips empty event batches. A production adapter must provide the same check-and-append guarantee across concurrent processes and durable storage. The event stream is the audit record; the read view is rebuilt by replaying it.
-
-## Requirements
-
-- PHP 8.5 or newer
-- Composer
-
-## Run
+The Composer constraint is PHP `^8.5` (PHP 8.5 or a later PHP 8.x release) and Composer.
 
 ```sh
 composer install
@@ -45,8 +32,6 @@ composer test
 php bin/demo.php
 ```
 
-The demo reproduces the supplied sequence. It prints a current value of `$1,104.45`, a frozen system value of `$1,050.00`, and all five adjustments, including the compensating correction.
+The demo follows the assignment example. It recalculates the system value to `$1,050.00`, then applies five manual corrections. It prints the frozen system value, each adjustment and comment, and the expected final value of `$1,104.45`.
 
-## Tests
-
-PHPUnit tests are organized under Domain, Application, and Infrastructure. They cover adjustment validation and replay, comment validation, event ownership, recalculation precedence, empty writes, stream isolation, expected-version writes, conflict handling, and preservation of history after a conflict.
+The PHPUnit suite covers the Domain, Application, and Infrastructure behavior, including event replay and optimistic concurrency conflicts.

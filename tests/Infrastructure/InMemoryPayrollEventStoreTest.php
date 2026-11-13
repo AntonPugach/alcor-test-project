@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Alcor\Payroll\Tests\Infrastructure;
 
 use Alcor\Payroll\Application\Exception\ConcurrencyException;
-use Alcor\Payroll\Domain\Event\PayrollEvent;
 use Alcor\Payroll\Domain\Event\SystemValueCalculated;
 use Alcor\Payroll\Domain\ValueObject\MoneyAmount;
 use Alcor\Payroll\Domain\ValueObject\PayrollLineId;

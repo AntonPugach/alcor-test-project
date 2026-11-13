@@ -6,7 +6,7 @@ namespace Alcor\Payroll\Application\ReadModel;
 
 final readonly class PayrollLineSnapshot
 {
-    /** @param  list<AdjustmentSnapshot>  $adjustments */
+    /** @param list<AdjustmentSnapshot> $adjustments */
     public function __construct(
         public string $lineId,
         public int $systemValueCents,

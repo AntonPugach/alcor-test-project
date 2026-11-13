@@ -14,7 +14,6 @@ use Alcor\Payroll\Domain\ValueObject\PayrollLineId;
 use DomainException;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
-use TypeError;
 
 final class PayrollLineTest extends TestCase
 {

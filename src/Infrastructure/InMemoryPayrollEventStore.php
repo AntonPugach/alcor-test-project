@@ -15,11 +15,13 @@ final class InMemoryPayrollEventStore implements PayrollEventStore
     /** @var array<string, list<PayrollEvent>> */
     private array $streams = [];
 
+    /** @return list<PayrollEvent> */
     public function eventsFor(PayrollLineId $lineId): array
     {
         return $this->streams[$lineId->value] ?? [];
     }
 
+    /** @param list<PayrollEvent> $events */
     public function append(PayrollLineId $lineId, array $events, int $expectedVersion): void
     {
         $stream        = $this->streams[$lineId->value] ?? [];

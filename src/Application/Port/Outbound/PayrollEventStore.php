@@ -12,6 +12,6 @@ interface PayrollEventStore
     /** @return list<PayrollEvent> */
     public function eventsFor(PayrollLineId $lineId): array;
 
-    /** @param  list<PayrollEvent>  $events */
+    /** @param list<PayrollEvent> $events */
     public function append(PayrollLineId $lineId, array $events, int $expectedVersion): void;
 }
