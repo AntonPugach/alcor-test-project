@@ -14,6 +14,7 @@ use Alcor\Payroll\Domain\ValueObject\PayrollLineId;
 use DomainException;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
+use TypeError;
 
 final class PayrollLineTest extends TestCase
 {
@@ -35,7 +36,7 @@ final class PayrollLineTest extends TestCase
 
     public function test_it_rejects_zero_value_adjustments(): void
     {
-        $id = new PayrollLineId('salary-line');
+        $id   = new PayrollLineId('salary-line');
         $line = PayrollLine::start($id);
         $line->recalculate(1_000);
 
@@ -44,10 +45,19 @@ final class PayrollLineTest extends TestCase
         $line->addAdjustment(0, 'Must not change the value.');
     }
 
+    public function test_a_manual_adjustment_requires_an_initial_system_calculation(): void
+    {
+        $line = PayrollLine::start(new PayrollLineId('salary-line'));
+
+        $this->expectException(DomainException::class);
+
+        $line->addAdjustment(100, 'Correction');
+    }
+
     public function test_system_calculation_accepts_zero_positive_and_negative_amounts(): void
     {
         foreach ([0, 1_000, -1_000] as $amountCents) {
-            $id = new PayrollLineId('salary-line-' . $amountCents);
+            $id   = new PayrollLineId('salary-line-'.$amountCents);
             $line = PayrollLine::start($id);
             $line->recalculate($amountCents);
 
@@ -101,5 +111,32 @@ final class PayrollLineTest extends TestCase
 
         self::assertSame([], $line->releaseEvents());
         self::assertSame(1_100, $line->currentValueCents());
+    }
+
+    public function test_replaying_recorded_events_reconstructs_the_same_state(): void
+    {
+        $id       = new PayrollLineId('salary-line');
+        $original = PayrollLine::start($id);
+        $original->recalculate(1_000);
+        $original->recalculate(1_050);
+        $original->addAdjustment(-50, 'First correction');
+        $original->addAdjustment(125, 'Compensating correction');
+        $history = $original->releaseEvents();
+
+        $reconstructed = PayrollLine::reconstitute($id, $history);
+
+        self::assertSame($original->systemValueCents(), $reconstructed->systemValueCents());
+        self::assertSame($original->currentValueCents(), $reconstructed->currentValueCents());
+        self::assertSame(
+            array_map(
+                static fn(ManualAdjustmentAdded $event): int => $event->amount->cents,
+                $original->adjustments(),
+            ),
+            array_map(
+                static fn(ManualAdjustmentAdded $event): int => $event->amount->cents,
+                $reconstructed->adjustments()
+            ),
+        );
+        self::assertSame([], $reconstructed->releaseEvents());
     }
 }

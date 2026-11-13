@@ -30,16 +30,28 @@ final class InMemoryPayrollEventStoreTest extends TestCase
         $store = new InMemoryPayrollEventStore();
         $id    = new PayrollLineId('salary-line');
         $store->append($id, [new SystemValueCalculated($id, new MoneyAmount(1_000))], 0);
+        $store->append($id, [
+            new SystemValueCalculated($id, new MoneyAmount(1_100)),
+            new SystemValueCalculated($id, new MoneyAmount(1_200)),
+        ], 1);
 
         try {
-            $store->append($id, [new SystemValueCalculated($id, new MoneyAmount(2_000))], 0);
+            $store->append($id, [
+                new SystemValueCalculated($id, new MoneyAmount(2_000)),
+                new SystemValueCalculated($id, new MoneyAmount(2_100)),
+            ], 0);
             self::fail('Expected a concurrency conflict.');
         } catch (ConcurrencyException $exception) {
             self::assertSame(0, $exception->expectedVersion);
-            self::assertSame(1, $exception->actualVersion);
+            self::assertSame(3, $exception->actualVersion);
         }
 
-        self::assertSame(1_000, $store->eventsFor($id)[0]->amount->cents);
+        $history = $store->eventsFor($id);
+        self::assertCount(3, $history);
+        self::assertSame([1_000, 1_100, 1_200], array_map(
+            static fn(SystemValueCalculated $event): int => $event->amount->cents,
+            $history,
+        ));
     }
 
     public function test_invalid_batch_append_does_not_partially_write(): void
@@ -77,9 +89,16 @@ final class InMemoryPayrollEventStoreTest extends TestCase
     {
         $store = new InMemoryPayrollEventStore();
         $id    = new PayrollLineId('salary-line');
+        $store->append($id, [new SystemValueCalculated($id, new MoneyAmount(1_000))], 0);
 
-        $store->append($id, [], 0);
+        $store->append($id, [], 1);
+        $store->append($id, [new SystemValueCalculated($id, new MoneyAmount(1_100))], 1);
 
-        self::assertSame([], $store->eventsFor($id));
+        $history = $store->eventsFor($id);
+        self::assertCount(2, $history);
+        self::assertSame([1_000, 1_100], array_map(
+            static fn(SystemValueCalculated $event): int => $event->amount->cents,
+            $history,
+        ));
     }
 }

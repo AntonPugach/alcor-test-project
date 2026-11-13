@@ -28,7 +28,10 @@ final class PayrollLineServiceTest extends TestCase
         $service->addAdjustment($id, 100, 'Correction');
 
         self::assertSame(1_100, $service->getLine($id)->currentValueCents);
-        self::assertCount(2, $store->eventsFor($id));
+        $history = $store->eventsFor($id);
+        self::assertCount(2, $history);
+        self::assertInstanceOf(SystemValueCalculated::class, $history[0]);
+        self::assertInstanceOf(ManualAdjustmentAdded::class, $history[1]);
     }
 
     public function test_it_preserves_the_assignment_example_result(): void
@@ -50,6 +53,16 @@ final class PayrollLineServiceTest extends TestCase
         self::assertSame(110_445, $line->currentValueCents);
         self::assertSame([-4_555, 10_010, -10, -20, 20], array_map(
             static fn($adjustment): int => $adjustment->amountCents,
+            $line->adjustments,
+        ));
+        self::assertSame([
+            'Declined dental benefit',
+            'Missed overtime bonus',
+            'Minor rounding adjustment',
+            'Second rounding adjustment',
+            'Correcting adjustment #4',
+        ], array_map(
+            static fn($adjustment): string => $adjustment->comment,
             $line->adjustments,
         ));
     }
